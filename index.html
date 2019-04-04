@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<script type="text/javascript">
+		function insertHtml(html) {
+			document.execCommand('insertHtml', false, html);
+		}
+		function insertImage(url, moid) {
+			if(!url) return;
+			document.execCommand('insertHtml', false, '<p><img class="MO_CLIP" moid="' + (moid || "") + '" style="max-width: 50% !important;" src="' + url + '"/></p><br>');
+		}
+		function insertVideo(url, moid) {
+			document.execCommand('insertHtml', false, '<p><video class="MO_CLIP" moid="' + (moid || "") + '" style="max-width: 50% !important; background:black;" src="' + url + '" controls="controls" /></p><br>');
+		}
+		function setContent(html) {
+			document.getElementById('editor').innerHTML = html;
+		}
+		function getContent() {
+			return document.getElementById('editor').innerHTML;
+		}
+
+
+		// function test_insertImage(url) {
+		// 	if(!url) return;
+		// 	document.execCommand('insertImage', false, url);
+		// }
+		// function test_insertVideo(url) {
+		// 	document.execCommand('insertVideo', false, url);
+		// }
+		function test_setContent() {
+			setContent('<p> test <span style="color: red;">red</span> test<p><p style="color: blue;">blue line</p><p>tail line</p>');
+		}
+
+	</script>
+</head>
+<body>
+	<div id="editor" contenteditable="true" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; overflow-y: auto; overflow-x: hidden;">
+	加载中...
+	</div>
+
+	<div id="test_panel" style="position: fixed; display: block; background: gray; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; width: 200px; height: 100px; padding: 10px;">
+		<button onclick="test_setContent()">setContent</button>
+		<button onclick="insertHtml('test')">insert text</button>
+		<button onclick="insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image</button>
+		<button onclick="insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video2</button>
+	<!-- 	<button onclick="test_insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image 2</button>
+		<button onclick="test_insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video 2</button>
+	 -->
+		<button onclick="alert(getContent())">getContent</button>
+	</div>
+</body>
+</html>
