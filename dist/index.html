@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title></title>
+    <script src="http://172.20.10.4:8080/target/target-script-min.js#anonymous"></script>
+    <style>
+        #editor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 10px;
+        }
+
+        #editor p {
+            margin: 0 0 15px 0;
+            text-indent: 2em;
+        }
+
+        /* 原始状态 */
+
+        #editor ins {
+            text-decoration: none;
+            display: inline;
+            color: inherit;
+            position: relative;
+        }
+
+        #editor del {
+            text-decoration: line-through;
+            display: none;
+            color: inherit;
+            position: relative;
+        }
+
+        /* 标记状态 */
+
+        #editor.revised-end ins {
+            text-decoration: underline;
+            /* border: solid 1px currentColor; */
+            display: inline;
+            /* color: red; */
+            color: black;
+        }
+
+        #editor.revised-end del {
+            text-decoration: line-through;
+            display: inline;
+            color: grey;
+        }
+
+        #editor.revised-end ins:before,
+        #editor.revised-end del:before,
+        #editor.revised-end ins:after,
+        #editor.revised-end del:after {
+            white-space: nowrap;
+            position: absolute;
+            top: -100%;
+            font-size: 9bt;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transform-origin: bottom left;
+            transform: scale(.5);
+            text-indent: 0;
+        }
+
+        #editor.revised-end ins:before {
+            left: -0.3em;
+            /* content: "〔INS"; */
+        }
+
+        #editor.revised-end del:before {
+            left: -0.3em;
+            /* content: "〔DEL"; */
+        }
+
+        #editor.revised-end ins:after,
+        #editor.revised-end del:after {
+            right: -0.25em;
+            /* content: "〕"; */
+            transform-origin: bottom right;
+        }
+
+        #editor.revised-end del:hover:before,
+        #editor.revised-end ins:hover:before {
+            transform: initial;
+            background-color: darkslateblue;
+            color: antiquewhite;
+            padding: 1px 0 3px;
+            z-index: 1;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            top: auto;
+            right: auto;
+            /* top: 130%; */
+        }
+
+        #editor.revised-end del:hover:before {
+            content: "〔 Deleted by "attr(cite)" at "attr(datetime)" 〕";
+        }
+
+        #editor.revised-end ins:hover:before {
+            content: "〔 Inserted by "attr(cite)" at "attr(datetime)" 〕";
+        }
+
+        #editor.revised-end del:hover:after,
+        #editor.revised-end ins:hover:after {
+            content: '';
+            /* top: 130%; */
+        }
+
+        /* #editor.revised-end ins:hover:after {
+			left: -11px;
+			top: 14%;
+			border: solid 12px transparent;
+			border-bottom-color: burlywood;
+			content: '';
+			width: 0;
+			height: 0;
+		} */
+
+        /* 无障碍阅读，为视力不便者提供 */
+
+        /* ins::before,
+		del::before,
+		ins::after,
+		del::after {
+			clip-path: inset(100%);
+			clip: rect(1px, 1px, 1px, 1px);
+			height: 1px;
+			overflow: hidden;
+			position: absolute;
+			white-space: nowrap;
+			width: 1px;
+		}
+
+		ins::before {
+			content: " [insertion start] ";
+		}
+
+		ins::after {
+			content: " [insertion end] ";
+		}
+
+		del::before {
+			content: " [deletion start] ";
+		}
+
+		del::after {
+			content: " [deletion end] ";
+		} */
+
+        /* 自制错别字波浪线 */
+
+        #editor>p span.spelling-error {
+            background: transparent url("data:image/gif;base64,R0lGODlhBQAEAJECAP////8AAAAAAAAAACH5BAEAAAIALAAAAAAFAAQAAAIIlGAXCCHrTCgAOw==") center bottom repeat-x;
+            border-bottom: solid 1px transparent;
+        }
+    </style>
+
+    <style id="user-colors">
+        /* #editor.revised-end ins[cite="veiky"],
+		#editor.revised-end del[cite="veiky"] {
+			color: red;
+		}
+
+		#editor.revised-end ins[cite="sun"],
+		#editor.revised-end del[cite="sun"] {
+			color: blue;
+		} */
+    </style>
+
+
+</head>
+
+<body>
+    <div id="editor" contenteditable="true" spellcheck="false">
+        <p>
+            <ins cite="veiky" datetime="2019-04-04T12:18">ssss</ins>
+            <del cite="veiky" datetime="2019-04-04T12:18">sssss</del>
+        </p>
+    </div>
+
+
+    <script id="browser" type="text/javascript">
+        // 智能机浏览器版本信息:
+        var browser = {
+            versions: function () {
+                var u = navigator.userAgent, app = navigator.appVersion;
+                return {//移动终端浏览器版本信息 
+                    ie: /(msie\s|trident.*rv:)([\w.]+)/.test(u.toLowerCase()),
+                    trident: u.indexOf('Trident') > -1, //IE内核
+                    presto: u.indexOf('Presto') > -1, //opera内核
+                    webKit: u.indexOf('AppleWebKit') > -1, //苹果、谷歌内核
+                    gecko: u.indexOf('Gecko') > -1 && u.indexOf('KHTML') == -1, //火狐内核
+                    mobile: !!u.match(/AppleWebKit.*Mobile.*/), //是否为移动终端
+                    ios: !!u.match(/\(i[^;]+;( U;)? CPU.+Mac OS X/), //ios终端
+                    android: u.indexOf('Android') > -1 || u.indexOf('Linux') > -1, //android终端或者uc浏览器
+                    iPhone: u.indexOf('iPhone') > -1, //是否为iPhone或者QQHD浏览器
+                    iPad: u.indexOf('iPad') > -1, //是否iPad  
+                    webApp: u.indexOf('Safari') == -1, //是否web应该程序，没有头部与底部
+                    weixin: u.indexOf('MicroMessenger') > -1, //是否微信 
+                    qq: u.match(/\sQQ/i) == " qq" //是否QQ
+                };
+            }(),
+            language: (navigator.browserLanguage || navigator.language).toLowerCase()
+        };
+
+        function wrapperConsole4Mobile(console) {
+            console = console || window.console;
+            var cs = document.createElement('PRE');
+            cs.style.position = 'fixed';
+            cs.style.top = '50%';
+            cs.style.right = '1vmin';
+            cs.style.bottom = '1vmin';
+            cs.style.left = '1vmin';
+            cs.style.padding = '1vmin';
+            cs.style.paddingBottom = '5vmin';
+            cs.style.border = 'solid 1px grey';
+            cs.style.background = '#000';
+            cs.style.color = '#fff';
+            cs.style.overflowX = 'hidden';
+            cs.style.overflowY = 'auto';
+
+            document.body.appendChild(cs);
+
+            var _log = console.log;
+            var _tostring = function (e) {
+                switch (typeof e) {
+                    case "undefined": return typeof e;
+                    case "boolean": return e ? 'true' : 'false';
+                    case "number": return e;
+                    case "string": return `"${e}"`;
+                    case "symbol": return 'symbol';
+                    case "function": return e.toString();
+                    case "object": {
+                        if (e === null) return 'null';
+                        else if (e instanceof HTMLElement) return e.outerHTML;
+                        else if (e instanceof Text) return `"${e.nodeValue}"`;
+                        else return JSON.stringify(e, null, 2);
+                    }
+                        break
+                    default:
+                        return 'error';
+                }
+            };
+            console.log = function () {
+                var stamp = new Date().toISOString();
+                var s = Array.from(arguments).map(_tostring).join(', ');
+                Array.from(arguments).forEach((e, i) => {
+                });
+                var span = document.createElement('EM');
+                span.style.paddingLeft = '5vmin';
+                span.style.textIndent = '-5vmin';
+                span.style.fontStyle = 'normal';
+                span.style.display = 'block';
+                // cs.appendChild(document.createTextNode('\n' + stamp + '\t' + s));
+                span.innerText = (stamp.replace(/[TZ]/g, ' ') + '   ' + s);
+                cs.appendChild(span);
+                cs.scrollTop = cs.scrollHeight;
+            };
+
+            // console.log(1, false, 'sss', { ss: 'ss' }, document.createElement('DIV'), document.createTextNode('text'));
+            // console.log(1, false, 'sss', { ss: 'ss' }, document.createElement('DIV'), document.createTextNode('text'));
+
+            // console.log("<br>语言版本: " + browser.language);
+            // console.log("<br> 是否为移动终端: " + browser.versions.mobile);
+            // console.log("<br> ios终端: " + browser.versions.ios);
+            // console.log("<br> android终端: " + browser.versions.android);
+            // console.log("<br> 是否为iPhone: " + browser.versions.iPhone);
+            // console.log("<br> 是否iPad: " + browser.versions.iPad);
+            // console.log("<br>" + navigator.userAgent);
+        };
+
+        // 手机下暂时不出自制的控制台了，因为可以使用webpack-dev-server + weinre 来远程调试
+		// window.addEventListener('load', () => {
+		// 	if (browser.versions.mobile) {
+		// 		wrapperConsole4Mobile(console);
+		// 	}
+		// }, false);
+
+    </script>
+
+    <script id="mobile" type="text/javascript">
+        var mobile = {
+            lastKeydownTime: 0,
+            lastCursorAt: null,
+            // 苹果手机下，长按删除键会触发fast delete，目前没有好的办法拦截它
+            // 只好采用这种变通的方式处理
+            saveBackspaceHold: function () {
+                if (!browser.versions.iPhone) {
+                    return false;
+                }
+                var t = new Date().getTime();
+                this.lastKeydownTime = t;
+                var sel = document.getSelection();
+                if (sel && sel.focusNode && sel.isCollapsed) {
+                    this.lastCursorAt = {
+                        focusNode: sel.focusNode,
+                        focusNodeValue: sel.focusNode && sel.focusNode.nodeType === 3 ? sel.focusNode.nodeValue : false,
+                        focusOffset: sel.focusOffset
+                    };
+                    console.log('save', sel.anchorOffset, __toString(sel.anchorNode))
+                    console.log('save', sel.focusOffset, __toString(sel.focusNode))
+
+                } else {
+                    this.lastCursorAt = undefined;
+                }
+            },
+            fixBackspaceHold: function () {
+                if (!browser.versions.iPhone) {
+                    return false;
+                }
+                var sel = document.getSelection();
+                if (!sel || sel.rangeCount === 0) return false;
+                var t = new Date().getTime();
+                console.log('t', t - this.lastKeydownTime);
+                if (t - this.lastKeydownTime < 150 && this.lastCursorAt) {
+                    try {
+                        console.log(sel.rangeCount)
+                        var rng = sel.getRangeAt(0);
+                        if (this.lastCursorAt.focusNode && this.lastCursorAt.focusNode.nodeType === 3) {
+                            this.lastCursorAt.focusNode.nodeValue = this.lastCursorAt.focusNodeValue;
+                        }
+                        rng.setStart(this.lastCursorAt.focusNode, this.lastCursorAt.focusOffset);
+                        rng.collapse(true);
+                        this.fixSelectionRange(sel, rng);
+                        console.log('restore', sel.anchorOffset, __toString(sel.anchorNode))
+                        console.log('restore', sel.focusOffset, __toString(sel.focusNode))
+                        return true;
+                    }
+                    catch (e) {
+                        console.error('eror', e)
+                    }
+                }
+                return false;
+            },
+            // 手机下，只修改range不起作用，必须重新sel.setRange一次
+            fixSelectionRange: function (sel, rng) {
+                if (browser.versions.mobile) {
+                    sel.empty();
+                    sel.addRange(rng);
+                }
+            },
+            // 手机输入法时，不触发compositionstart和compositionend事件的解决办法
+            // ascii字符输入时，走的还是char部分
+            fixCompositionNotWork: function () {
+                if (browser.versions.mobile) {
+                    __insert();
+                    return true;
+                }
+                return false;
+            }
+        };
+
+    </script>
+
+    <script id="UE.utils" type="text/javascript">
+        var utils = {
+            listToMap: function (list) {
+                if (!list) return {};
+                list = utils.isArray(list) ? list : list.split(',');
+                for (var i = 0, ci, obj = {}; ci = list[i++];) {
+                    obj[ci.toUpperCase()] = obj[ci] = 1;
+                }
+                return obj;
+            },
+            isArray: function (obj) {
+                return Object.prototype.toString.apply(obj) == '[object Array]';
+            }
+        };
+    </script>
+
+    <script id="UE.domUtils" type="text/javascript">
+        var domUtils = {
+            // used
+            findParentByTagName: function (node, tagNames, includeSelf, excludeFn) {
+                tagNames = utils.listToMap(utils.isArray(tagNames) ? tagNames : [tagNames]);
+                return domUtils.findParent(node, function (node) {
+                    return tagNames[node.tagName] && !(excludeFn && excludeFn(node));
+                }, includeSelf);
+            },
+            // not used
+            findParent: function (node, filterFn, includeSelf) {
+                if (node && !domUtils.isBody(node)) {
+                    node = includeSelf ? node : node.parentNode;
+                    while (node) {
+                        if (!filterFn || filterFn(node) || domUtils.isBody(node)) {
+                            return filterFn && !filterFn(node) && domUtils.isBody(node) ? null : node;
+                        }
+                        node = node.parentNode;
+                    }
+                }
+                return null;
+            },
+            // not used
+            isBody: function (node) {
+                return node && node.nodeType == 1 && node.tagName.toLowerCase() == 'body';
+            },
+            // used
+            isSameElement: function (nodeA, nodeB) {
+                if (nodeA.tagName != nodeB.tagName) {
+                    return false;
+                }
+                var thisAttrs = nodeA.attributes,
+                    otherAttrs = nodeB.attributes;
+                if (!browser.ie && thisAttrs.length != otherAttrs.length) {
+                    return false;
+                }
+                var attrA, attrB, al = 0, bl = 0;
+                for (var i = 0; attrA = thisAttrs[i++];) {
+                    if (attrA.nodeName == 'style') {
+                        if (attrA.specified) {
+                            al++;
+                        }
+                        if (domUtils.isSameStyle(nodeA, nodeB)) {
+                            continue;
+                        } else {
+                            return false;
+                        }
+                    }
+                    if (browser.ie) {
+                        if (attrA.specified) {
+                            al++;
+                            attrB = otherAttrs.getNamedItem(attrA.nodeName);
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        attrB = nodeB.attributes[attrA.nodeName];
+                    }
+                    if (!attrB.specified || attrA.nodeValue != attrB.nodeValue) {
+                        return false;
+                    }
+                }
+                // 有可能attrB的属性包含了attrA的属性之外还有自己的属性
+                if (browser.ie) {
+                    for (i = 0; attrB = otherAttrs[i++];) {
+                        if (attrB.specified) {
+                            bl++;
+                        }
+                    }
+                    if (al != bl) {
+                        return false;
+                    }
+                }
+                return true;
+            },
+            isSameStyle: function (nodeA, nodeB) {
+                var styleA = nodeA.style.cssText.replace(/( ?; ?)/g, ';').replace(/( ?: ?)/g, ':'),
+                    styleB = nodeB.style.cssText.replace(/( ?; ?)/g, ';').replace(/( ?: ?)/g, ':');
+                if (browser.opera) {
+                    styleA = nodeA.style;
+                    styleB = nodeB.style;
+                    if (styleA.length != styleB.length)
+                        return false;
+                    for (var p in styleA) {
+                        if (/^(\d+|csstext)$/i.test(p)) {
+                            continue;
+                        }
+                        if (styleA[p] != styleB[p]) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                if (!styleA || !styleB) {
+                    return styleA == styleB;
+                }
+                styleA = styleA.split(';');
+                styleB = styleB.split(';');
+                if (styleA.length != styleB.length) {
+                    return false;
+                }
+                for (var i = 0, ci; ci = styleA[i++];) {
+                    if (styleB.indexOf(ci) == -1) {
+                        return false;
+                    }
+                }
+                return true;
+            },
+        };
+    </script>
+
+
+    <script id="cache" type="text/javascript">
+        // DELETEME 这个类貌似没有用到
+        var __cache = {
+            startContainer: null,
+            startOffset: -1,
+            endContainer: null,
+            endOffset: -1,
+            collapsed: false,
+            save: function (sel, toStart) {
+                if (!sel || sel.rangeCount === 0) return false;
+                var rng = sel.getRangeAt(0), tmp;
+                this.startContainer = rng.startContainer;
+                this.startOffset = rng.startOffset;
+                if (typeof toStart === 'undefined') {
+                    this.startContainer = rng.startContainer;
+                    this.startOffset = rng.startOffset;
+                    this.endContainer = rng.endContainer;
+                    this.endOffset = rng.endOffset;
+                    this.collapsed = rng.collapsed;
+                } else if (toStart) {
+                    if (rng.startOffset === 0) {
+                        this.startContainer = this.endContainer = (tmp = rng.startContainer.parentNode);
+                        this.startOffset = this.endOffset = Array.from(tmp.childNodes).indexOf(rng.startContainer);
+                    } else {
+                        this.startContainer = this.endContainer = rng.startContainer;
+                        this.startOffset = this.endOffset = rng.startOffset;
+                    }
+                    this.collapsed = true;
+                    console.log(this)
+                } else {
+                    this.startContainer = this.endContainer = rng.endContainer;
+                    this.startOffset = this.endOffset = rng.endOffset;
+                    this.collapsed = true;
+                }
+                return true;
+            },
+            restore: function (sel) {
+                if (!sel || sel.rangeCount === 0) return false;
+                var rng = sel.getRangeAt(0);
+                rng.setStart(this.startContainer, this.startOffset);
+                rng.setEnd(this.endContainer, this.endOffset);
+            }
+        };
+    </script>
+
+    <script id="utils" type="text/javascript">
+        var __isDel = function (node) {
+            return node && node.nodeType === 1 && node.tagName === 'DEL' && node;
+        };
+        var __inDel = function (node) {
+            return (node = domUtils.findParentByTagName(node, 'DEL', true));
+        };
+        var __isIns = function (node) {
+            return node && node.nodeType === 1 && node.tagName === 'INS' && node;
+        };
+        var __inIns = function (node) {
+            return (node = domUtils.findParentByTagName(node, 'INS', true));
+        };
+        var __isClose = function (node) {
+            return node.nodeType === 1 && { br: 1, img: 1, hr: 1 }[node.tagName.toLowerCase()];
+        };
+        var __isEmpty = function (node) {
+            if (!node) return false;
+            else if (node.nodeType === 3) return node.nodeValue.length === 0;
+            else if (node.nodeType === 1) return !node.firstChild || !Array.from(node.childNodes).some(e => !__isEmpty(e));
+            else if (node.nodeType === 11) return node.firstChild || !Array.from(node.childNodes).some(e => !__isEmpty(e));
+            else return false;
+        };
+        var __mergeSibling = function (node, ignorePre, ignoreNext) {
+            function merge(rtl, start, node) {
+                var next, child = node[start];
+                if ((next = node[rtl]) && node.nodeType === 3 && next.nodeType === 3) {
+                    __mergeTextSibling(rtl === 'nextSibling' ? node : next);
+                    return;
+                }
+                if ((next = node[rtl]) && next.nodeType == 1 && domUtils.isSameElement(node, next)) {
+                    while (next.firstChild) {
+                        if (start == 'firstChild') {
+                            node.insertBefore(next.lastChild, node.firstChild);
+                        } else {
+                            node.appendChild(next.firstChild);
+                        }
+                    }
+                    next.parentNode.removeChild(next);
+                    // merge child
+                    if (child) merge(rtl, start, child);
+                }
+            }
+            !ignorePre && merge('previousSibling', 'firstChild', node);
+            !ignoreNext && merge('nextSibling', 'lastChild', node);
+        };
+        var __mergeTextSibling = function (node) {
+            var next;
+            if (node && node.nodeType === 3 && (next = node.nextSibling) && next.nodeType === 3) {
+                node.nodeValue += next.nodeValue;
+                next.parentNode.removeChild(next);
+            }
+        };
+        var __mergeDelChilds = function (node) {
+            var prev = node.firstChild, next;
+            while (prev && (next = prev.nextSibling)) {
+                if (__isDel(prev) && __isDel(next)
+                    && prev.getAttribute('cite') === next.getAttribute('cite')
+                    && prev.getAttribute('datetime') === next.getAttribute('datetime')) {
+                    while (next.firstChild) {
+                        prev.appendChild(next.firstChild);
+                    }
+                    next.parentNode.removeChild(next);
+                }
+                else {
+                    prev = next;
+                }
+            }
+        };
+        var __toString = function (e) {
+            if (typeof e === 'object' && e instanceof Array) {
+                return `[${e.map(__toString).join(',')}]`;
+            }
+            return e.nodeType === 3 ? `"${e.nodeValue}"` : e.nodeType === 11 ? Array.from(e.childNodes).reduce((a, e) => {
+                return a + __toString(e);
+            }, "") : e.outerHTML;
+        };
+        var __date = function () {
+            return new Date().toISOString().substring(0, 16).replace('T', ' ');
+        };
+
+
+        // TODO 修改的通用一点
+        var __isPStart = function (node, offset) {
+            if (!node) return false;
+            if (node.nodeType === 3 && offset > 0) return false;
+            if (__isRoot(node)) return node.childNodes[offset];
+            var p = domUtils.findParentByTagName(node, 'P');
+            while (!node.previousSibling && node !== p) {
+                node = node.parentNode;
+            }
+            return node === p && p;
+        };
+
+        var __isPEnd = function (node, offset) {
+            if (!node) return false;
+            if (node.nodeType === 3 && offset < node.nodeValue.length) return false;
+            if (__isRoot(node)) return node.childNodes[offset - 1];
+            var p = domUtils.findParentByTagName(node, 'P');
+            while (!node.nextSibling && node !== p) {
+                node = node.parentNode;
+            }
+            return node === p && p;
+        };
+
+		/**
+		 * @param 
+		 * 从当前位置拆分两个兄弟节点，一直拆分到tagName指定的父标签（ignoreTagName=true不拆此标签）
+		 * 返回拆分的后面标签
+		 */
+        var __splitToTag = function (node, offset, tagName, ignoreTagName) {
+            if (!node || !tagName) return;
+            var tag = domUtils.findParentByTagName(node, tagName, true);
+            if (!tag) return;
+            var next, child;
+            while (node !== (ignoreTagName ? tag : tag.parentNode)) {
+                // 在当前节点之前拆
+                if (offset === 0) {
+                    offset = Array.from(node.parentNode.childNodes).indexOf(node);
+                    node = node.parentNode;
+                }
+                else {
+                    // 拆文本节点
+                    if (node.nodeType === 3) {
+                        next = node.splitText(offset);
+                        if (next.nodeValue.length <= 0) node.parentNode.removeChild(next);
+                    } else if (child = node.childNodes[offset]) {
+                        next = node.cloneNode(false);
+                        node.parentNode.insertBefore(next, node.nextSibling);
+                        while (child = node.childNodes[offset]) { next.appendChild(child); }
+                    }
+                    offset = Array.from(node.parentNode.childNodes).indexOf(node) + 1;
+                    node = node.parentNode;
+                }
+            }
+            return node.childNodes[offset];
+        };
+    </script>
+
+    <script id="selection" type="text/javascript">
+        // TODO 重新整理这个函数，尤其是合并
+        var __visitMultiLineFrag = function (frag) {
+            return Array.from(frag.childNodes).map(p => {
+                // 处理本次被删除的段落里的内容
+                Array.from(p.childNodes).forEach(e => {
+                    // 早前已经删除的内容不用管，不管谁删的
+                    if (__isDel(e)) {
+                        // NOP
+                    }
+                    // 如果是自己插入的内容，则直接删除
+                    else if ((tmp = __isIns(e)) && document.user === tmp.getAttribute('cite')) {
+                        tmp.parentNode.removeChild(tmp);
+                    }
+                    else if (e.nodeType === 1 && e.tagName === 'IMG') {
+                        var info = document.createElement('ABBR');
+                        info.innerText = '[图片已删除]';
+                        info.title = '已删除的图片：' + e.src;
+                        var del = __createDel();
+                        del.appendChild(info);
+                        p.insertBefore(del, e);
+                        p.removeChild(e);
+                    }
+                    // 其他节点全用删除线包括
+                    else {
+                        var del = __createDel();
+                        p.insertBefore(del, e);
+                        del.appendChild(e);
+                    }
+                });
+                // 合并相同人和时间的删除标记
+                __mergeDelChilds(p);
+                return p;
+            });
+        };
+
+        var __visitMultiBlockFrag = function (frag) {
+            Array.from(frag.childNodes).forEach(e => {
+                if (__isDel(e)) {
+                    __mergeSibling(e, false, true);
+                }
+                else if ((tmp = __isIns(e)) && document.user === tmp.getAttribute('cite')) {
+                    frag.removeChild(tmp);
+                }
+                else {
+                    var del = __createDel();
+                    frag.insertBefore(del, e);
+                    del.appendChild(e);
+                    __mergeSibling(del, false, true);
+                }
+            });
+            return Array.from(frag.childNodes);
+        };
+
+
+        // 当前选区是否跨了多行（或多个 <P>）
+        var __isMultiLineSelection = function () {
+            var sel = document.getSelection();
+            if (!sel || sel.rangeCount === 0) return false;
+            var rng = sel.getRangeAt(0);
+            var frag = rng.cloneContents();
+
+            var bml; // bool multi line
+            // 跨行删除，frag里必然都是P， 这是一种判断方式
+            bml = Array.from(frag.childNodes).reduce((a, c) => a && c.nodeType === 1 && c.tagName === 'P', true);
+            if (!bml) return false;
+            // 还可以根据range的端点来判断
+            // console.log(rng.startContainer, rng.startOffset, rng.endContainer, rng.endOffset);
+            bml = (__isRoot(rng.startContainer) && rng.startOffset !== rng.endOffset)
+                || ((tmp = domUtils.findParentByTagName(rng.startContainer, 'P')) && tmp !== domUtils.findParentByTagName(rng.endContainer, 'P'));
+            return bml;
+        };
+
+        // 收缩焦点到最小位置，比如TextNode，BR等
+        // 尚未处理非collapsed选区
+        var __shrink = function () {
+            var sel = document.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            var rng = sel.getRangeAt(0);
+            if (!rng.collapsed) {
+                console.error('非collapsed选区尚不支持收缩');
+                return;
+            }
+
+            var start = rng.startContainer, offset = rng.startOffset;
+            if (start.nodeType === 3 || __isClose(start)) return;
+
+            while (start.nodeType === 1 && start.firstChild) {
+                if (offset <= 0) {
+                    start = start.firstChild;
+                    offset = 0;
+                } else if (offset >= start.childNodes.length) {
+                    start = start.lastChild;
+                    offset = start.nodeType === 3 ? start.nodeValue.length : start.childNodes.length;
+                } else {
+                    start = start.childNodes[offset];
+                    start = 0;
+                }
+            }
+            if (start !== rng.startContainer) {
+                rng.setStart(start, offset);
+                rng.collapse(true);
+                mobile.fixSelectionRange(sel, rng);
+            }
+        };
+    </script>
+
+    <script id="core" type="text/javascript">
+
+        // 按键是否形成输入（包含回车和空格）
+        var __isCharKeyDown = function (evt) {
+            var keyCode = evt.keyCode || evt.which;
+
+            var isChar =
+                (keyCode > 47 && keyCode < 58) || // number keys
+                keyCode === 32 || keyCode === 13 || // spacebar & return key(s) (if you want to allow carriage returns)
+                (keyCode > 64 && keyCode < 91) || // letter keys
+                (keyCode > 95 && keyCode < 112) || // numpad keys
+                (keyCode > 185 && keyCode < 193) || // ;=,-./` (in order)
+                (keyCode > 218 && keyCode < 223);   // [\]' (in order)
+
+            if (isChar) {
+                //// character key
+                // will delete all selected
+                // console.log('character')
+            } else {
+                //// control key
+                // only delete and backspace will delete all selected
+                // console.log('control', evt)
+            }
+            return isChar;
+        };
+
+        // FIXME
+        var __isRoot = function (node) {
+            return node && node.nodeType === 1 && node.id === 'editor';
+        };
+
+        var __createDel = function () {
+            var del = document.createElement('DEL');
+            del.setAttribute('cite', document.user);
+            del.setAttribute('datetime', __date());
+            return del;
+        };
+
+        var __createIns = function (user, datetime) {
+            var ins = document.createElement('INS');
+            ins.setAttribute('cite', user || document.user);
+            ins.setAttribute('datetime', datetime || __date());
+            return ins;
+        };
+
+        var __prevent = function (evt) {
+            typeof evt.returnValue !== 'cancelBubble' && (evt.cancelBubble = true);
+            typeof evt.returnValue !== 'undefined' && (evt.returnValue = false);
+            evt.preventDefault && evt.preventDefault();
+            evt.stopPropagation && evt.stopPropagation();
+        };
+
+        // TODO 这将是一个不包含undo/redo的实现
+        var __delete = function (cursorToStart) {
+            var sel = document.getSelection();
+            if (!sel) {
+                console.warn('selection is null');
+                return;
+            }
+            // console.log('anchor', sel.anchorOffset, sel.anchorNode, __toString(sel.anchorNode));
+            // console.log('focus', sel.focusOffset, sel.focusNode, __toString(sel.focusNode));
+            if (sel.rangeCount === 0) {
+                console.warn('selection\'s rangeCount is 0');
+                return;
+            }
+            var rng = sel.getRangeAt(0);
+            if (rng.collapsed) return;
+
+            var start = rng.startContainer, end = rng.endContainer, tmp;
+            // console.log('before delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+            if (typeof cursorToStart === 'undefined') {
+                cursorToStart = sel.focusNode === start && sel.focusOffset === rng.startOffset;
+            }
+
+            var frag = rng.cloneContents();
+            // Array.from(frag.childNodes).forEach((e, i) => {
+            // 	console.log(`frag[${i}]`, __toString(e));
+            // });
+
+            var mline = __isMultiLineSelection(), mblock = (start !== end);
+            // 跨行删除
+            if (mline) {
+                if (frag.childNodes.length === 2 && __isEmpty(frag.firstChild) && __isEmpty(frag.lastChild)) {
+                    // 删除空行
+                    console.info('delete a line seperator');
+                    rng.collapse(cursorToStart);
+                    mobile.fixSelectionRange(sel, rng);
+                    return;
+                }
+
+                // 保存删除前的状态
+                var delFromPHead = __isPStart(start, rng.startOffset), delToPTail = __isPEnd(end, rng.endOffset);
+
+                // 删除
+                document.execCommand('delete', false, null);
+                rng = sel.getRangeAt(0);
+                start = rng.startContainer;
+                end = rng.endContainer;
+                // console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+                // 插入<p><del></p>
+                // 1. 从某行首开始删的，插入在此行之前
+                // 2. 从某行中开始删的，先拆此行，然后插入在后行之前
+                var dps = __visitMultiLineFrag(frag); // deleted p lines
+                var pnext = delFromPHead || __splitToTag(start, rng.startOffset, 'P');
+                // FIXME
+                var parent = pnext ? pnext.parentNode : document.getElementById('editor');
+                Array.from(dps).reverse().forEach(p => pnext = parent.insertBefore(p, pnext));
+
+                // 整理焦点
+                if (cursorToStart) {
+                    // 从行首开始删的，焦点落在第一个<p><del></p>行首，否则落在所有<p><del></p>的前一行尾
+                    delFromPHead ? rng.setStart(start = dps[0], 0) : rng.setStart(start = dps[0].previousSibling, start.childNodes.length)
+                } else {
+                    // 焦点落在最后一个<p><del></p>的行尾即可
+                    rng.setStart(start = dps[dps.length - 1], start.childNodes.length)
+                }
+                rng.collapse(true);
+                mobile.fixSelectionRange(sel, rng);
+                __shrink();
+                rng = sel.getRangeAt(0);
+                start = rng.startContainer;
+                end = rng.endContainer;
+                // console.log('after shrink\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+                // 合并第一<p><del></p>行，往前
+                if (!delFromPHead) {
+                    __mergeSibling(dps[0].previousSibling, true, false);
+                }
+                // 合并最后<p><del></p>行，往后
+                if (!delToPTail) {
+                    __mergeSibling(dps[dps.length - 1], true, false);
+                }
+                // 删除最后一个空行<p><br></p>
+                if (delFromPHead && delToPTail) {
+                    delFromPHead.parentNode.removeChild(delFromPHead);
+                }
+
+            }
+            // 行内多节点删除
+            else if (mblock) {
+                // 删除
+                document.execCommand('delete', false, null);
+                rng = sel.getRangeAt(0);
+                start = rng.startContainer;
+                end = rng.endContainer;
+                // console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+                // 插入<del>
+                var dbs = __visitMultiBlockFrag(frag); // deleted blocks
+                var bnext;
+                if (tmp = __inDel(start)) bnext = __splitToTag(start, rng.startOffset, 'DEL') || tmp.nextSibling;
+                else if (tmp = __inIns(start)) bnext = __splitToTag(start, rng.startOffset, 'INS') || tmp.nextSibling;
+                // TODO still a text in span in p ??
+                else if (start.nodeType === 3) bnext = start.splitText(rng.startOffset);
+
+                else if (start.nodeType === 1 && start.tagName === 'P') {
+                    bnext = start.childNodes[rng.startOffset], tmp = bnext;
+                    // TODO remove br
+                }
+                else {
+                    console.error('not supported yet!');
+                    return;
+                }
+                Array.from(dbs).reverse().forEach(b => bnext = bnext.parentNode.insertBefore(b, bnext));
+
+                // 整理焦点
+                if (cursorToStart) {
+                    // 从行首开始删的，焦点落在第一个<p><del></p>行首，否则落在所有<p><del></p>的前一行尾
+                    // rng.setStart(start = dbs[0], 0);
+                    if (tmp = dbs[0].previousSibling) rng.setStart(start = tmp, start.nodeType === 3 ? start.nodeValue.length : start.childNodes.length);
+                    else rng.setStart(dbs[0], 0);
+                } else {
+                    // 焦点落在最后一个<p><del></p>的行尾即可
+                    rng.setStart(start = dbs[dbs.length - 1], start.nodeType === 3 ? start.nodeValue.length : start.childNodes.length)
+                }
+                rng.collapse(true);
+                mobile.fixSelectionRange(sel, rng);
+                __shrink();
+                rng = sel.getRangeAt(0);
+                start = rng.startContainer;
+                end = rng.endContainer;
+                // console.log('after shrink\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+                // TODO 合并前后的删除节点
+                __mergeSibling(dbs[0], false, true);
+                __mergeSibling(dbs[dbs.length - 1], true, false);
+            }
+            // 行内单节点内的删除
+            else {
+                if (__inDel(start)) {
+                    // 仅移动光标，选区闭合
+                    rng.collapse(cursorToStart);
+                    mobile.fixSelectionRange(sel, rng);
+                }
+                else if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite')) {
+                    // 仅删除，选区闭合
+                    document.execCommand('delete', false, null);
+                }
+                else if (tmp = domUtils.findParentByTagName(start, 'P', true)) {
+                    // 保存信息，删除的是别人的插入
+                    var ins = __inIns(start), p = tmp;
+                    // 删除
+                    document.execCommand('delete', false, null);
+                    rng = sel.getRangeAt(0);
+                    start = rng.startContainer;
+                    end = rng.endContainer;
+                    // console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+                    var next = __splitToTag(start, rng.startOffset, 'P', true);
+                    var parent = next ? next.parentNode : p;
+                    // 插入<del>
+                    var dbs = __visitMultiBlockFrag(frag); // deleted blocks
+                    // console.log(__toString(dbs))
+                    if (ins = ins && ins.cloneNode(false)) {
+                        // TODO 这里默认只有一个片段了哦
+                        var del = __createDel();
+                        ins.appendChild(document.createTextNode(frag.textContent));
+                        del.appendChild(ins);
+                        dbs = [del];
+                    }
+                    Array.from(dbs).reverse().forEach(b => next = parent.insertBefore(b, next));
+
+                    // 整理焦点
+                    if (cursorToStart) {
+                        if (tmp = dbs[0].previousSibling) rng.setStart(start = tmp, start.nodeType === 3 ? start.nodeValue.length : start.childNodes.length);
+                        else rng.setStart(dbs[0], 0);
+                    } else {
+                        rng.setStart(start = dbs[dbs.length - 1], start.nodeType === 3 ? start.nodeValue.left : start.childNodes.length);
+                    }
+                    rng.collapse(true);
+                    mobile.fixSelectionRange(sel, rng);
+                    __shrink();
+
+                    rng = sel.getRangeAt(0);
+                    start = rng.startContainer;
+                    end = rng.endContainer;
+                    // console.log('after shrink\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+                    // 合并前后节点
+                    // 不出意外的话，片段应该只有一个
+                    __mergeSibling(dbs[0], false, true);
+                    __mergeSibling(dbs[dbs.length - 1], true, false);
+                } else {
+                    console.error('element that are not p\'s child, not supported yet!');
+                }
+            }
+        };
+
+
+        var __deleteBackward = function () {
+            var sel = document.getSelection(), tmp;
+            if (!sel) return;
+            if (sel.isCollapsed) {
+                sel.modify('extend', 'backward', 'character');
+            }
+            __delete(true);
+        };
+
+        var __deleteForward = function () {
+            var sel = document.getSelection(), tmp;
+            if (!sel) return;
+            if (sel.isCollapsed) {
+                sel.modify('extend', 'forward', 'character');
+            }
+            __delete(false);
+        };
+
+        var __insert = function () {
+            var sel = document.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            if (!sel.isCollapsed) __delete();
+            var rng = sel.getRangeAt(0), tmp, start = rng.startContainer, end = rng.endContainer;
+            // console.log('before insert\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+
+            var now = __date();
+            if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite') && now === tmp.getAttribute('datetime')) {
+                // NOP
+            }
+            else {
+                var p = domUtils.findParentByTagName(start, 'P', true);
+                var next = start !== p ? __splitToTag(start, rng.startOffset, 'P', true) : null;
+                if (p === start && (tmp = p.childNodes[rng.startOffset]) && tmp.nodeType === 1 && tmp.tagName === 'BR') p.removeChild(tmp);
+                var ins = __createIns();
+                ins.innerHTML = '\u200B';
+                p.insertBefore(ins, next);
+                rng.setStart(ins.firstChild, 0);
+                rng.setEnd(ins.firstChild, 1);
+                // rng.collapse(true);
+                mobile.fixSelectionRange(sel, rng);
+
+                rng = sel.getRangeAt(0);
+                start = rng.startContainer;
+                end = rng.endContainer;
+                // console.log('after prepare insert\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+                // TODO 合并前后节点
+            }
+        };
+
+        var __cancelInsert = function () {
+            var sel = document.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            var rng = sel.getRangeAt(0), tmp, next;
+            var start = rng.startContainer;
+            var end = rng.endContainer;
+
+            if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite') && tmp.textContent === '\u200B') {
+                if (next = tmp.previousSibling) rng.setStart(next, next.nodeType === 3 ? next.nodeValue.length : next.childNodes.length);
+                else if (next = tmp.nextSibling) rng.setStart(next, 0);
+                rng.collapse(true);
+                mobile.fixSelectionRange(sel, rng);
+                __shrink();
+                tmp.parentNode.removeChild(tmp);
+            }
+        };
+
+        // 拖拽
+        var __drag = function (evt) {
+            var sel = document.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            var rng = sel.getRangeAt(0), start = rng.startContainer, end = rng.endContainer;
+            if (evt.type === 'dragstart') {
+                var data = evt.dataTransfer;
+                data.clearData();
+                data.effectAllowed = evt.ctrlKey ? 'copy' : 'move';
+                // TODO filter frag or selection
+                // TODO 暂只支持纯文本
+                var frag = rng.cloneContents();
+                data.setData('text/plain', frag.textContent);
+            }
+            if (evt.type === 'dragend') {
+                // console.log('dragend');
+                // FIXME 妈蛋，有时候并不会触发dragend
+                var frag = rng.cloneContents();
+                document.execCommand('delete', false, null);
+                __insert();
+                // TODO 暂只支持纯文本
+                document.execCommand('insertHtml', false, frag.textContent);
+                __prevent(evt);
+            }
+        };
+        var __drop = function (evt) {
+            console.log('drop');
+            __delete();
+        };
+
+        // 剪切和粘贴
+        var __cut = function (evt) {
+            __delete();
+        };
+        var __paste = function (evt) {
+            __delete();
+            __insert();
+            __prevent(evt);
+            var data = evt.clipboardData;
+            var text = data.getData('text/plain');
+            var tmp = document.createElement('textarea');
+            tmp.innerText = text;
+            // TODO 暂时先不允许插入多行文本
+            // text = tmp.innerHTML.split('<br>').map(s => {
+            // 	var ins = __createIns();
+            // 	ins.innerText = s;
+            // 	s = ins.outerHTML;
+            // 	return `<p>${s}</p>`;
+            // }).join('');
+            // FIXME 妈蛋，insertHTML插入<del><ins>以后容易变成span
+            // 改成自己插入节点？？？
+            document.execCommand('insertHtml', false, text);
+            // TODO 只粘贴纯文本，避免XSS攻击
+            // console.log(data.getData('text/html'));
+        };
+
+        // 输入法
+        var __compStart = function (evt) {
+            console.log('composition start')
+            __insert();
+        };
+        var __compUpdate = function (evt) {
+            // NOP
+        };
+        var __compEnd = function (evt) {
+            // 好像浏览器自己会做
+            // if (evt.data.length === 0) __cancelInsert();
+            console.log('composition end')
+        };
+
+        // 键盘
+        var __keydown = function (evt) {
+            var keyCode = evt.keyCode || evt.which;
+            // 形成输入
+            if (__isCharKeyDown(evt) && !evt.ctrlKey && !evt.altKey) {
+
+                // space
+                if (keyCode === 32) {
+                    // __insert();
+                    var sel = document.getSelection();
+                    if (!sel || sel.rangeCount === 0) return;
+                    var rng = sel.getRangeAt(0), start = rng.startContainer, tmp;
+                    var now = __date();
+                    if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite') && now === tmp.getAttribute('datetime')) {
+                        // NOP
+                    } else {
+                        __delete();
+                        __insert();
+                        __prevent(evt);
+                        document.execCommand('insertHtml', false, '&nbsp;');
+                    }
+                }
+                // enter
+                else if (keyCode === 13) {
+                    __insert();
+                }
+                // char
+                else {
+                    __insert();
+                    // __prevent(evt);
+                }
+            }
+            // backspace
+            else if (keyCode === 8) {
+                __prevent(evt);
+                __deleteBackward();
+
+                // FIXME 苹果手机加速删除问题，尚未解决，以下方式不可行
+                // 会造成文本闪动，而且还是少了一个字
+                // mobile.fixBackspaceHold();
+                // __deleteBackward();
+                // mobile.saveBackspaceHold();
+            }
+            // delete
+            else if (keyCode === 46) {
+                __prevent(evt);
+                __deleteForward();
+            }
+            else {
+                if (!mobile.fixCompositionNotWork()) {
+                    console.warn('something wrong ??');
+                }
+            }
+        };
+
+    </script>
+
+
+
+
+    <script id="hack" type="text/javascript">
+        var __exec = document.execCommand;
+
+        // TODO 还需要屏蔽相关命令的键盘快捷键，和右键菜单
+        document.execCommand = function (aCommandName, aShowDefaultUI, aValueArgument) {
+            if (aCommandName === 'undo'
+                || aCommandName === 'redo') {
+                console.warn(`抱歉，暂不支持执行命令: ${aCommandName}`);
+                return;
+            }
+            __exec.call(document, aCommandName, aShowDefaultUI, aValueArgument);
+        };
+
+    </script>
+
+
+
+
+    <script id="api" type="text/javascript">
+        // TODO 以下是老接口，尚未整理
+        function insertHtml(html) {
+            document.execCommand('insertHtml', false, html);
+        }
+        function insertImage(url, moid) {
+            if (!url) return;
+            document.execCommand('insertHtml', false, '<p><img class="MO_CLIP" moid="' + (moid || "") + '" style="max-width: 50% !important;" src="' + url + '"/></p>');
+        }
+        function insertVideo(url, moid) {
+            document.execCommand('insertHtml', false, '<p><video class="MO_CLIP" moid="' + (moid || "") + '" style="max-width: 50% !important; background:black;" src="' + url + '" controls="controls" /></p>');
+        }
+        function setContent(html) {
+            if (!html) return;
+            if (!html.startsWith('<')) {
+                // 一律当作纯文本
+                var temp = document.createElement('TEXTAREA');
+                temp.innerText = html;
+                // console.log(html)
+                html = temp.innerHTML;
+                // console.log(html)
+                html = html.split('<br>').map(s => `<p style="text-indent: 2em;">${s}</p>`).reduce((acc, cur) => { return acc + cur; });
+            } else {
+                // TODO 避免XSS攻击
+            }
+            document.getElementById('editor').innerHTML = html;
+        }
+        function getContent() {
+            return document.getElementById('editor').innerHTML;
+        }
+
+		/**
+		 * 以下是新接口， 并没有处理undo / redo
+		 */
+        // 初始化变量
+        // @property {bool} revised 是否开启修订模式
+        // document.revised = typeof document.revised === 'undefined' ? false : document.revised;
+        document.revised = false;
+
+        // @property {string} user 当前编辑的用户
+        document.user = null;
+
+        // 是否显示修订标记
+        document.revisedVisible = false;
+
+        // 设置修订状态
+        function setRevised(revised) {
+            if (document.revised) {
+                document.removeEventListener('keydown', __keydown, false);
+                document.removeEventListener('compositionstart', __compStart, false);
+                document.removeEventListener('compositionupdate', __compUpdate, false);
+                document.removeEventListener('compositionend', __compEnd, false);
+                document.removeEventListener('cut', __cut, false);
+                document.removeEventListener('paste', __paste, false);
+                document.removeEventListener('drag', __drag, false);
+                document.removeEventListener('dragstart', __drag, false);
+                document.removeEventListener('dragend', __drag, false);
+                document.removeEventListener('dragover', __drag, false);
+                document.removeEventListener('dragenter', __drag, false);
+                document.removeEventListener('dragleave', __drag, false);
+                document.removeEventListener('drop', __drop, false);
+            }
+            document.revised = revised;
+            if (document.revised) {
+                document.addEventListener('keydown', __keydown, false);
+                document.addEventListener('compositionstart', __compStart, false);
+                document.addEventListener('compositionupdate', __compUpdate, false);
+                document.addEventListener('compositionend', __compEnd, false);
+                document.addEventListener('cut', __cut, false);
+                document.addEventListener('paste', __paste, false);
+                document.addEventListener('drag', __drag, false);
+                document.addEventListener('dragstart', __drag, false);
+                document.addEventListener('dragend', __drag, false);
+                document.addEventListener('dragover', __drag, false);
+                document.addEventListener('dragenter', __drag, false);
+                document.addEventListener('dragleave', __drag, false);
+                document.addEventListener('drop', __drop, false);
+            }
+        }
+        // 切换修订状态
+        function toggleRevised() {
+            setRevised(!document.revised);
+        }
+
+        // 设置是否显示编辑标记
+        function setRevisedVisible(visible) {
+            document.revisedVisible = visible;
+
+            var editor = document.getElementById('editor');
+            if (!editor) return;
+            var clzs = (editor.className || '').split(' ');
+            if (document.revisedVisible && !clzs.includes('revised-end')) editor.className += 'revised-end';
+            else if (!document.revisedVisible && clzs.includes('revised-end')) editor.className = clzs.filter(s => s !== 'revised-end').join(' ');
+        }
+
+        // {user:color, user: color}
+        function setUserColors(colors) {
+            if (!colors || typeof colors !== 'object') return;
+            var style = document.head.querySelector('#user-colors');
+            style.innerText = Object.keys(colors).map(user => `#editor.revised-end ins[cite="${user}"],#editor.revised-end del[cite="${user}"] { color: ${colors[user]};}`).join('\n');
+        }
+
+        function setUser(user) {
+            document.user = user || 'anonymous';
+        }
+        // 主动初始化一下，不可省略
+        setRevised(document.revised);
+        setRevisedVisible(document.revisedVisible);
+    </script>
+
+
+    <script id="samples" type="text/javascript">
+        setRevised(true);
+        setRevisedVisible(true);
+        setUserColors({
+            veiky: 'red',
+            sun: 'blue'
+        });
+        setUser('veiky');
+
+
+        setContent(
+            `新华社北京4月2日电  近日，中共中央总书记、国家主席、中央军委主席习近平对民政工作作出重要指示。习近平强调，近年来，民政系统认真贯彻中央决策部署，革弊鼎新、攻坚克难，各项事业取得新进展，有力服务了改革发展稳定大局。
+习近平指出，民政工作关系民生、连着民心，是社会建设的兜底性、基础性工作。各级党委和政府要坚持以人民为中心，加强对民政工作的领导，增强基层民政服务能力，推动民政事业持续健康发展。各级民政部门要加强党的建设，坚持改革创新，聚焦脱贫攻坚，聚焦特殊群体，聚焦群众关切，更好履行基本民生保障、基层社会治理、基本社会服务等职责，为全面建成小康社会、全面建设社会主义现代化国家作出新的贡献。
+第十四次全国民政会议4月2日在北京召开。会上传达了习近平的重要指示。
+中共中央政治局常委、国务院总理李克强会见与会代表并讲话，向默默耕耘在基层一线、倾情尽力为困难群众服务的全国民政系统广大干部职工致以诚挚问候，对近年来民政工作取得的成绩充分肯定。他说，民政工作直接面对人民群众，是社会治理和社会服务的重要组成部分，是扶危济困的德政善举。当前，我国正处在全面建成小康社会的决胜阶段，人民追求美好生活的愿望十分强烈，民政工作的任务艰巨繁重。要坚持以习近平新时代中国特色社会主义思想为指导，贯彻落实党中央、国务院决策部署，着力保基本兜底线，织密扎牢民生保障“安全网”。服务打赢脱贫攻坚战，做好低保和特困人员包括生活困难的老年人、重度残疾人、重病患者、困境儿童等的基本生活保障工作。着力发展基本社会服务，解决好群众关切的“为难事”。深化“放管服”改革，让群众办事更便捷，更大发挥社会力量作用，积极发展贴近需求的社区养老托幼等服务，丰富生活服务供给，带动扩大就业和有效内需。要大力发展社会工作和慈善事业，弘扬志愿服务精神，人人参与、人人尽力，使社会大家庭更加温馨和谐。各级政府要贯彻以人民为中心的发展思想，关心民政、支持民政，多做雪中送炭、增进民生福祉的事，促进经济持续健康发展和社会和谐稳定。
+国务委员王勇参加会见并在会上讲话指出，要深入学习贯彻习近平总书记关于民政工作的重要论述和指示精神，认真落实李克强总理讲话要求，牢固树立以人民为中心的发展思想，全面扎实完成脱贫攻坚兜底保障任务，加强和完善各类困难群体基本生活保障，不断提升基层社会治理和社会基本服务水平，努力推进民政事业改革发展上新台阶。
+肖捷、何立峰参加会见。
+第十四次全国民政会议的任务是，以习近平新时代中国特色社会主义思想为指导，认真学习贯彻习近平关于民政工作的重要论述，总结党的十八大以来民政事业改革发展取得的成就，研究部署今后一个时期的民政工作。
+各省区市和计划单列市、新疆生产建设兵团，中央和国家机关有关部门负责同志，全国民政系统先进集体、先进工作者和劳动模范、“孺子牛奖”获得者代表等出席会议。
+责任编辑：郭立`
+        );
+// 		setContent(
+// 			'<p>新华社北<del cite="veiky" datetime="2019-04-04T15:32">京4月2日电  近日，中共中央总书记、国</del>家主席、<ins cite="sun" datetime="2019-04-04T15:32">中央军委主席习近平</ins><ins cite="veiky" datetime="2019-04-04T15:32">对民政工作作出重</ins>要指示。习近平强调，近年来，民政系统认真贯彻中央决策部署，革弊鼎新、攻坚克难，各项事业取得新进展，有力服务了改革发展稳定大局。</p>\
+// <p>习近平指出，民政<ins cite="veiky" datetime="2019-04-04T15:32">工作关系民生、连着民心，是社会建</ins>设的兜底性、基础性工作。各级党委和政府要坚持以人民为中心，加强对民政工作的领导，增强基层民政服务能力，推动民政事业持续健康发展。各级民政部门要加强党的建设，坚持改革创新，聚焦脱贫攻坚，聚焦特殊群体，聚焦群众关切，更好履行基本民生保障、基层社会治理、基本社会服务等职责，为全面建成小康社会、全面建设社会主义现代化国家作出新的贡献。</p>\
+// <p><del cite="veiky" datetime="2019-04-04T15:32">第十四次全国民政会议4月2日在北京召开。会上传达了习近平的重要指示。</del></p>\
+// <p><del cite="veiky" datetime="2019-04-04T15:32">责任编辑：</del><ins cite="veiky" datetime="2019-04-04T15:32">郭立</ins></p>'
+// 		);
+			// setContent(
+			// 	'<p>新华社北<del cite="veiky" datetime="2019-04-04T15:32">京4月2日电  近日，中共中央总书记、国</del>家主席、<ins cite="sun" datetime="2019-04-04T15:32">中央军委主席习近平对</ins><ins cite="veiky" datetime="2019-04-04T15:32">民政工作作出重</ins>要指示。习近平强调，近年来，民政系统认真贯彻中央决策部署，革弊鼎新、攻坚克难，各项事业取得新进展，有力服务了改革发展稳定大局。</p>'
+			// );
+			// setContent('<p><br></p>');
+			// setContent('<p>123456789</p><p>abcdefghijklmn</p><p>`-=[]\;\',./</p><p>~!@#$%^&*()_+{}|:"<>?</p>');
+
+    </script>
+
+
+    <!-- 以下是可以删除的测试部分 -->
+    <div id="test_panel" style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; min-height: 80px; padding: 10px;">
+        <label>当前编辑用户：
+            <select onchange="setUser(this.value)">
+                <option>veiky</option>
+                <option>sun</option>
+            </select>
+        </label>
+        <label>
+            <input id="test_chk_revised" type="checkbox" value="" /> 修订
+        </label>
+        <label>
+            <input id="test_chk_revised_visible" type="checkbox" value="" /> 显示标记
+        </label>
+        <br>
+        <!-- <label>
+            <input id="test_chk_spellcheck" type="checkbox" value="" /> 拼写检查
+        </label>
+        <br> -->
+
+
+        <button onclick="test_setContent()">setContent</button>
+        <button onclick="insertHtml('test')">insert text</button>
+        <button onclick="insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image
+        </button>
+        <button onclick="insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video</button>
+        <!-- 	<button onclick="test_insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image 2</button>
+		<button onclick="test_insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video 2</button>
+	 -->
+        <button onclick="alert(getContent())">getContent</button>
+
+        <script type="text/javascript">
+            var editor = document.getElementById('editor');
+            document.getElementById('test_chk_revised').checked = document.revised;
+            document.getElementById('test_chk_revised').addEventListener('change', (evt) => {
+                setRevised(evt.target.checked);
+                if (document.revised) {
+                    // document.getElementById('test_chk_spellcheck').checked = false;
+                } else {
+                    setRevisedVisible(false);
+                }
+            }, false);
+            document.getElementById('test_chk_revised_visible').checked = document.revisedVisible;
+            document.getElementById('test_chk_revised_visible').addEventListener('change', (evt) => {
+                setRevisedVisible(evt.target.checked);
+            }, false);
+            // document.getElementById('test_chk_spellcheck').checked = editor.spellcheck;
+            // document.getElementById('test_chk_spellcheck').addEventListener('change', (evt) => {
+            //     editor.spellcheck = evt.target.checked;
+            // }, false);
+
+            // function test_insertImage(url) {
+            // 	if(!url) return;
+            // 	document.execCommand('insertImage', false, url);
+            // }
+            // function test_insertVideo(url) {
+            // 	document.execCommand('insertVideo', false, url);
+            // }
+            function test_setContent() {
+                setContent('<p> test <span style="color: red;">red</span> test<p><p style="color: blue;">blue line</p><p>tail line</p>');
+            }
+        </script>
+    </div>
+</body>
+
+</html>
