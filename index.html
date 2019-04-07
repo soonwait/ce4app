@@ -289,8 +289,8 @@
 
     </script>
 
-    <script id="ios-fix" type="text/javascript">
-        var __iosFixer = {
+    <script id="mobile" type="text/javascript">
+        var mobile = {
             lastKeydownTime: 0,
             lastCursorAt: null,
             // 苹果手机下，长按删除键会触发fast delete，目前没有好的办法拦截它
@@ -327,7 +327,7 @@
                     try {
                         console.log(sel.rangeCount)
                         var rng = sel.getRangeAt(0);
-                        if(this.lastCursorAt.focusNode && this.lastCursorAt.focusNode.nodeType === 3) {
+                        if (this.lastCursorAt.focusNode && this.lastCursorAt.focusNode.nodeType === 3) {
                             this.lastCursorAt.focusNode.nodeValue = this.lastCursorAt.focusNodeValue;
                         }
                         rng.setStart(this.lastCursorAt.focusNode, this.lastCursorAt.focusOffset);
@@ -337,26 +337,27 @@
                         console.log('restore', sel.focusOffset, __toString(sel.focusNode))
                         return true;
                     }
-                    catch(e) {
+                    catch (e) {
                         console.error('eror', e)
                     }
                 }
                 return false;
             },
-            // 苹果手机下，只修改range不起作用，必须重新sel.setRange一次
+            // 手机下，只修改range不起作用，必须重新sel.setRange一次
             fixSelectionRange: function (sel, rng) {
-                if (!browser.versions.iPhone) {
-                    return false;
+                if (browser.versions.mobile) {
+                    sel.empty();
+                    sel.addRange(rng);
                 }
-                sel.empty();
-                sel.addRange(rng);
             },
-            // 苹果手机输入法时，不触发compositionstart和compositionend事件的解决办法
+            // 手机输入法时，不触发compositionstart和compositionend事件的解决办法
             // ascii字符输入时，走的还是char部分
             fixCompositionNotWork: function () {
-                if (!browser.versions.iPhone) return;
-
-                __insert();
+                if (browser.versions.mobile) {
+                    __insert();
+                    return true;
+                }
+                return false;
             }
         };
 
@@ -774,7 +775,7 @@
             if (start !== rng.startContainer) {
                 rng.setStart(start, offset);
                 rng.collapse(true);
-                __iosFixer.fixSelectionRange(sel, rng);
+                mobile.fixSelectionRange(sel, rng);
             }
         };
     </script>
@@ -870,7 +871,7 @@
                     // 删除空行
                     console.info('delete a line seperator');
                     rng.collapse(cursorToStart);
-                    __iosFixer.fixSelectionRange(sel, rng);
+                    mobile.fixSelectionRange(sel, rng);
                     return;
                 }
 
@@ -902,7 +903,7 @@
                     rng.setStart(start = dps[dps.length - 1], start.childNodes.length)
                 }
                 rng.collapse(true);
-                __iosFixer.fixSelectionRange(sel, rng);
+                mobile.fixSelectionRange(sel, rng);
                 __shrink();
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
@@ -963,7 +964,7 @@
                     rng.setStart(start = dbs[dbs.length - 1], start.nodeType === 3 ? start.nodeValue.length : start.childNodes.length)
                 }
                 rng.collapse(true);
-                __iosFixer.fixSelectionRange(sel, rng);
+                mobile.fixSelectionRange(sel, rng);
                 __shrink();
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
@@ -981,7 +982,7 @@
                 if (__inDel(start)) {
                     // 仅移动光标，选区闭合
                     rng.collapse(cursorToStart);
-                    __iosFixer.fixSelectionRange(sel, rng);
+                    mobile.fixSelectionRange(sel, rng);
                     console.log('in delete')
                 }
                 else if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite')) {
@@ -1021,7 +1022,7 @@
                         rng.setStart(start = dbs[dbs.length - 1], start.nodeType === 3 ? start.nodeValue.left : start.childNodes.length);
                     }
                     rng.collapse(true);
-                    __iosFixer.fixSelectionRange(sel, rng);
+                    mobile.fixSelectionRange(sel, rng);
                     __shrink();
                     console.log(sel.anchorOffset, __toString(sel.anchorNode))
                     console.log(sel.focusOffset, __toString(sel.focusNode))
@@ -1084,10 +1085,7 @@
                 rng.setStart(ins.firstChild, 0);
                 rng.setEnd(ins.firstChild, 1);
                 // rng.collapse(true);
-                if (browser.versions.iPhone) {
-                    sel.empty();
-                    sel.addRange(rng);
-                }
+                mobile.fixSelectionRange(sel, rng);
 
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
@@ -1109,7 +1107,7 @@
                 if (next = tmp.previousSibling) rng.setStart(next, next.nodeType === 3 ? next.nodeValue.length : next.childNodes.length);
                 else if (next = tmp.nextSibling) rng.setStart(next, 0);
                 rng.collapse(true);
-                __iosFixer.fixSelectionRange(sel, rng);
+                mobile.fixSelectionRange(sel, rng);
                 __shrink();
                 tmp.parentNode.removeChild(tmp);
             }
@@ -1225,9 +1223,9 @@
 
                 // FIXME 苹果手机加速删除问题，尚未解决，以下方式不可行
                 // 会造成文本闪动，而且还是少了一个字
-                // __iosFixer.fixBackspaceHold();
+                // mobile.fixBackspaceHold();
                 // __deleteBackward();
-                // __iosFixer.saveBackspaceHold();
+                // mobile.saveBackspaceHold();
             }
             // delete
             else if (keyCode === 46) {
@@ -1235,8 +1233,9 @@
                 __deleteForward();
             }
             else {
-                __iosFixer.fixCompositionNotWork();
-                console.warn('something wrong ??');
+                if (!mobile.fixCompositionNotWork()) {
+                    console.warn('something wrong ??');
+                }
             }
         };
 
@@ -1411,14 +1410,13 @@
 
 
     <!-- 以下是可以删除的测试部分 -->
-    <div id="test_panel" style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; max-width: 200px; min-height: 100px; padding: 10px;">
+    <div id="test_panel" style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; min-height: 100px; padding: 10px;">
         <label>当前编辑用户：
             <select onchange="setUser(this.value)">
                 <option>veiky</option>
                 <option>sun</option>
             </select>
         </label>
-        <br>
         <label>
             <input id="test_chk_revised" type="checkbox" value="" /> 修订
         </label>
@@ -1426,17 +1424,17 @@
             <input id="test_chk_revised_visible" type="checkbox" value="" /> 显示标记
         </label>
         <br>
-        <label>
+        <!-- <label>
             <input id="test_chk_spellcheck" type="checkbox" value="" /> 拼写检查
         </label>
-        <br>
+        <br> -->
 
 
         <button onclick="test_setContent()">setContent</button>
         <button onclick="insertHtml('test')">insert text</button>
         <button onclick="insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image
         </button>
-        <button onclick="insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video2</button>
+        <button onclick="insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video</button>
         <!-- 	<button onclick="test_insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image 2</button>
 		<button onclick="test_insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video 2</button>
 	 -->
@@ -1448,7 +1446,7 @@
             document.getElementById('test_chk_revised').addEventListener('change', (evt) => {
                 setRevised(evt.target.checked);
                 if (document.revised) {
-                    document.getElementById('test_chk_spellcheck').checked = false;
+                    // document.getElementById('test_chk_spellcheck').checked = false;
                 } else {
                     setRevisedVisible(false);
                 }
@@ -1457,10 +1455,10 @@
             document.getElementById('test_chk_revised_visible').addEventListener('change', (evt) => {
                 setRevisedVisible(evt.target.checked);
             }, false);
-            document.getElementById('test_chk_spellcheck').checked = editor.spellcheck;
-            document.getElementById('test_chk_spellcheck').addEventListener('change', (evt) => {
-                editor.spellcheck = evt.target.checked;
-            }, false);
+            // document.getElementById('test_chk_spellcheck').checked = editor.spellcheck;
+            // document.getElementById('test_chk_spellcheck').addEventListener('change', (evt) => {
+            //     editor.spellcheck = evt.target.checked;
+            // }, false);
 
             // function test_insertImage(url) {
             // 	if(!url) return;
