@@ -490,7 +490,9 @@
         };
     </script>
 
+
     <script id="cache" type="text/javascript">
+        // DELETEME 这个类貌似没有用到
         var __cache = {
             startContainer: null,
             startOffset: -1,
@@ -846,10 +848,7 @@
                 return;
             }
             var rng = sel.getRangeAt(0);
-            if (rng.collapsed) {
-                console.warn('range is collapsed');
-                return;
-            }
+            if (rng.collapsed) return;
 
             var start = rng.startContainer, end = rng.endContainer, tmp;
             // console.log('before delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
@@ -858,7 +857,6 @@
             }
 
             var frag = rng.cloneContents();
-            console.log(frag.textContent)
             // Array.from(frag.childNodes).forEach((e, i) => {
             // 	console.log(`frag[${i}]`, __toString(e));
             // });
@@ -866,7 +864,6 @@
             var mline = __isMultiLineSelection(), mblock = (start !== end);
             // 跨行删除
             if (mline) {
-                console.log('mline')
                 if (frag.childNodes.length === 2 && __isEmpty(frag.firstChild) && __isEmpty(frag.lastChild)) {
                     // 删除空行
                     console.info('delete a line seperator');
@@ -926,8 +923,6 @@
             }
             // 行内多节点删除
             else if (mblock) {
-                console.log('mblock')
-
                 // 删除
                 document.execCommand('delete', false, null);
                 rng = sel.getRangeAt(0);
@@ -977,18 +972,14 @@
             }
             // 行内单节点内的删除
             else {
-                // console.log('inline')
-
                 if (__inDel(start)) {
                     // 仅移动光标，选区闭合
                     rng.collapse(cursorToStart);
                     mobile.fixSelectionRange(sel, rng);
-                    console.log('in delete')
                 }
                 else if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite')) {
                     // 仅删除，选区闭合
                     document.execCommand('delete', false, null);
-                    console.log('just delete')
                 }
                 else if (tmp = domUtils.findParentByTagName(start, 'P', true)) {
                     // 保存信息，删除的是别人的插入
@@ -1024,9 +1015,6 @@
                     rng.collapse(true);
                     mobile.fixSelectionRange(sel, rng);
                     __shrink();
-                    console.log(sel.anchorOffset, __toString(sel.anchorNode))
-                    console.log(sel.focusOffset, __toString(sel.focusNode))
-
 
                     rng = sel.getRangeAt(0);
                     start = rng.startContainer;
@@ -1037,8 +1025,6 @@
                     // 不出意外的话，片段应该只有一个
                     __mergeSibling(dbs[0], false, true);
                     __mergeSibling(dbs[dbs.length - 1], true, false);
-                    console.log(sel.anchorOffset, __toString(sel.anchorNode))
-                    console.log(sel.focusOffset, __toString(sel.focusNode))
                 } else {
                     console.error('element that are not p\'s child, not supported yet!');
                 }
@@ -1048,7 +1034,7 @@
 
         var __deleteBackward = function () {
             var sel = document.getSelection(), tmp;
-            if (!sel) { console.warn('selection missing'); return; }
+            if (!sel) return;
             if (sel.isCollapsed) {
                 sel.modify('extend', 'backward', 'character');
             }
@@ -1069,7 +1055,7 @@
             if (!sel || sel.rangeCount === 0) return;
             if (!sel.isCollapsed) __delete();
             var rng = sel.getRangeAt(0), tmp, start = rng.startContainer, end = rng.endContainer;
-            console.log('before insert\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+            // console.log('before insert\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
 
             var now = __date();
             if ((tmp = __inIns(start)) && document.user === tmp.getAttribute('cite') && now === tmp.getAttribute('datetime')) {
@@ -1090,8 +1076,7 @@
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
                 end = rng.endContainer;
-                console.log(start.parentNode.outerHTML)
-                console.log('after prepare insert\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+                // console.log('after prepare insert\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
                 // TODO 合并前后节点
             }
         };
@@ -1128,7 +1113,7 @@
                 data.setData('text/plain', frag.textContent);
             }
             if (evt.type === 'dragend') {
-                console.log('dragend');
+                // console.log('dragend');
                 // FIXME 妈蛋，有时候并不会触发dragend
                 var frag = rng.cloneContents();
                 document.execCommand('delete', false, null);
@@ -1186,7 +1171,6 @@
         // 键盘
         var __keydown = function (evt) {
             var keyCode = evt.keyCode || evt.which;
-            console.log(keyCode)
             // 形成输入
             if (__isCharKeyDown(evt) && !evt.ctrlKey && !evt.altKey) {
 
@@ -1410,7 +1394,7 @@
 
 
     <!-- 以下是可以删除的测试部分 -->
-    <div id="test_panel" style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; min-height: 100px; padding: 10px;">
+    <div id="test_panel" style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; min-height: 80px; padding: 10px;">
         <label>当前编辑用户：
             <select onchange="setUser(this.value)">
                 <option>veiky</option>
