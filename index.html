@@ -22,17 +22,15 @@
 
         #editor p {
             margin: 0 0 15px 0;
-            /* text-indent: 2em; */
+            text-indent: 2em;
         }
 
         /* 原始状态 */
 
         #editor ins {
             text-decoration: none;
-            /* text-decoration: underline; */
-            /* display: inline; */
-            /* color: inherit; */
-            /* color: red; */
+            display: inline;
+            color: inherit;
             position: relative;
         }
 
@@ -360,6 +358,13 @@
                     return true;
                 }
                 return false;
+            },
+            fixBIU: function(evt) {
+                // TODO 在编辑器支持添加格式之前
+                // 手机上暂时禁用BIU，目前在IOS上看到了，Android还没试
+                if(browser.mobile && ['formatBold', 'formatItalic', 'formatUnderline'].indexOf(evt.inputType) >= 0) {
+                    __prevent(evt);
+                }
             }
         };
 
@@ -625,32 +630,22 @@
             if (!node) return false;
             if (node.nodeType === 3 && offset > 0) return false;
             if (__isRoot(node)) return node.childNodes[offset];
-            var p = domUtils.findParentByTagName(node, 'P', true);
-            if (node.nodeType === 3) {
-                offset = Array.from(node.parentNode.childNodes).indexOf(node);
+            var p = domUtils.findParentByTagName(node, 'P');
+            while (!node.previousSibling && node !== p) {
                 node = node.parentNode;
             }
-            while (offset === 0 && node !== p) {
-                offset = Array.from(node.parentNode.childNodes).indexOf(node);
-                node = node.parentNode;
-            }
-            return node === p && offset === 0 && p;
+            return node === p && p;
         };
 
         var __isPEnd = function (node, offset) {
             if (!node) return false;
             if (node.nodeType === 3 && offset < node.nodeValue.length) return false;
             if (__isRoot(node)) return node.childNodes[offset - 1];
-            var p = domUtils.findParentByTagName(node, 'P', true);
-            if (node.nodeType === 3) {
-                offset = Array.from(node.parentNode.childNodes).indexOf(node) + 1;
+            var p = domUtils.findParentByTagName(node, 'P');
+            while (!node.nextSibling && node !== p) {
                 node = node.parentNode;
             }
-            while (!node.childNodes[offset] && node !== p) {
-                offset = Array.from(node.parentNode.childNodes).indexOf(node) + 1;
-                node = node.parentNode;
-            }
-            return node === p && offset === node.childNodes.length && p;
+            return node === p && p;
         };
 
 		/**
@@ -792,51 +787,6 @@
                 mobile.fixSelectionRange(sel, rng);
             }
         };
-        var __shrink = function () {
-            var sel = document.getSelection();
-            if (!sel || sel.rangeCount === 0) return;
-            var rng = sel.getRangeAt(0);
-            var start = rng.startContainer, startOffset = rng.startOffset;
-            while (start.nodeType === 1 && start.firstChild) {
-                if (startOffset >= start.childNodes.length) {
-                    start = start.lastChild;
-                    startOffset = start.nodeType === 3 ? start.nodeValue.length : start.childNodes.length;
-                } else {
-                    start = start.childNodes[startOffset];
-                    startOffset = 0;
-                }
-            }
-            if (rng.collapsed) {
-                if (start !== rng.startContainer) {
-                    rng.setStart(start, startOffset);
-                    rng.collapse(true);
-                    mobile.fixSelectionRange(sel, rng);
-                }
-                return;
-            }
-            var end = rng.endContainer, endOffset = rng.endOffset;
-            while (end.nodeType === 1 && end.firstChild) {
-                if (endOffset >= end.childNodes.length) {
-                    end = end.lastChild;
-                    endOffset = end.nodeType === 3 ? end.nodeValue.length : end.childNodes.length;
-                } else if (endOffset === 0 && end.previousSibling) { // TODO
-                    end = end.previousSibling;
-                    endOffset = end.nodeType === 3 ? end.nodeValue.length : end.childNodes.length;
-                } else if(end.childNodes[endOffset - 1]) {
-                    end = end.childNodes[endOffset - 1];
-                    endOffset = end.nodeType === 3 ? end.nodeValue.length : end.childNodes.length;
-                } else { // TODO
-                    end = end.childNodes[endOffset];
-                    endOffset = 0;
-                }
-            }
-            if (start !== rng.startContainer || end !== rng.endContainer) {
-                if (start !== rng.startContainer) rng.setStart(start, startOffset);
-                if (end !== rng.endContainer) rng.setEnd(end, endOffset);
-                // rng.collapse(true);
-                mobile.fixSelectionRange(sel, rng);
-            }
-        };
     </script>
 
     <script id="core" type="text/javascript">
@@ -865,13 +815,9 @@
             return isChar;
         };
 
-        // FIXME 本应用只能包含一个编辑器
+        // FIXME
         var __isRoot = function (node) {
             return node && node.nodeType === 1 && node.id === 'editor';
-        };
-        // FIXME 本应用只能包含一个编辑器
-        var __getRoot = function () {
-            return document.getElementById('editor');
         };
 
         var __createDel = function () {
@@ -895,81 +841,6 @@
             evt.stopPropagation && evt.stopPropagation();
         };
 
-        // var __getAncestors = function (node, includeSelf) {
-        //     if (!node) return [];
-        //     var arr = [], par; while (par = node.parentNode) arr.unshift(par);
-        //     if (includeSelf) arr.push(node);
-        //     return arr;
-        // };
-
-        // var __isBoundaryNode = function (node, dir, boundaryNode) {
-        //     var tmp;
-        //     while (node !== boundaryNode) {
-        //         tmp = node;
-        //         node = node.parentNode;
-        //         if (tmp !== node[dir]) {
-        //             return false;
-        //         }
-        //     }
-        //     return true;
-        // };
-
-        var __includeInvisibles = function (sel, rng) {
-            if (document.revisedVisible) return;
-
-            var start = rng.startContainer, end = rng.endContainer, root = __getRoot();
-            if (!(start.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_CONTAINS)) {
-                console.warn('selection start is out of editor');
-                return;
-            }
-            if (!(end.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_CONTAINS)) {
-                console.warn('selection end is out of editor');
-                return;
-            }
-            var startOffset = rng.startOffset, startMoved;
-            while (startOffset === 0) {
-                startOffset = Array.from(start.parentNode.childNodes).indexOf(start);
-                start = start.parentNode;
-                if (start.nodeType === 1 && start.tagName === 'P') break;
-                if (start.nodeType === 1 && start === root) return;
-            }
-            if (start.nodeType === 1 && start.tagName === 'P') {
-                var prev;
-                while ((prev = start.childNodes[startOffset - 1]) && __isDel(prev)) {// && prev !== prev.parentNode.lastChild) {
-                    startOffset--;
-                    startMoved = true;
-                }
-            }
-            var endOffset = rng.endOffset, endMoved;
-            while (endOffset === (end.nodeType === 3 ? end.nodeValue.length : end.childNodes.length)) {
-                endOffset = Array.from(end.parentNode.childNodes).indexOf(end) + 1;
-                end = end.parentNode;
-                if (end.nodeType === 1 && end.tagName === 'P') break;
-                if (end.nodeType === 1 && end === root) return;
-            }
-            if (end.nodeType === 1 && end.tagName === 'P') {
-                var next, isntDel = false;
-                // 当一段里选区后面全部都是del时，浏览器默认不删除他们，至少chrome是这样
-                next = end.childNodes[endOffset];
-                while (next) {
-                    if(!__isDel(next)) isntDel = true;
-                    next = next.nextSibling;
-                }
-                if(isntDel) {
-                    while ((next = end.childNodes[endOffset]) && __isDel(next)) {// && next !== next.parentNode.firstChild) {
-                        endOffset++;
-                        endMoved = true;
-                    }
-                }
-            }
-            if (startMoved || endMoved) {
-                if (startMoved) rng.setStart(start, startOffset);
-                if (endMoved) rng.setEnd(end, endOffset);
-                __shrink();
-                // mobile.fixSelectionRange();
-            }
-        };
-
         // TODO 这将是一个不包含undo/redo的实现
         var __delete = function (cursorToStart) {
             var sel = document.getSelection();
@@ -987,30 +858,20 @@
             if (rng.collapsed) return;
 
             var start = rng.startContainer, end = rng.endContainer, tmp;
-            console.log('before delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+            // console.log('before delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
             if (typeof cursorToStart === 'undefined') {
                 cursorToStart = sel.focusNode === start && sel.focusOffset === rng.startOffset;
             }
 
-            __includeInvisibles(sel, rng);
-            rng = sel.getRangeAt(0);
-            start = rng.startContainer;
-            end = rng.endContainer;
-            console.log('before delete ... include invisible\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
             var frag = rng.cloneContents();
-            Array.from(frag.childNodes).forEach((e, i) => {
-                console.log(`frag[${i}]`, __toString(e));
-            });
+            // Array.from(frag.childNodes).forEach((e, i) => {
+            // 	console.log(`frag[${i}]`, __toString(e));
+            // });
 
             var mline = __isMultiLineSelection(), mblock = (start !== end);
             // 跨行删除
             if (mline) {
-                if (__isEmpty(frag.firstChild) && __isEmpty(frag.lastChild)) {
-                    frag.removeChild(frag.lastChild);
-                    frag.removeChild(frag.firstChild);
-                }
-                if (frag.childNodes.length === 0) {
-                    // if (frag.childNodes.length === 2 && __isEmpty(frag.firstChild) && __isEmpty(frag.lastChild)) {
+                if (frag.childNodes.length === 2 && __isEmpty(frag.firstChild) && __isEmpty(frag.lastChild)) {
                     // 删除空行
                     console.info('delete a line seperator');
                     rng.collapse(cursorToStart);
@@ -1020,16 +881,13 @@
 
                 // 保存删除前的状态
                 var delFromPHead = __isPStart(start, rng.startOffset), delToPTail = __isPEnd(end, rng.endOffset);
-                var delFromPTail = __isPEnd(start, rng.startOffset), delToPHead = __isPStart(end, rng.endOffset);
-
-                console.log('delFromPHead', delFromPHead, 'delFromPTail', delFromPTail, 'delToPHead', delToPHead, 'delToPTail', delToPTail);
 
                 // 删除
                 document.execCommand('delete', false, null);
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
                 end = rng.endContainer;
-                console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+                // console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
 
                 // 插入<p><del></p>
                 // 1. 从某行首开始删的，插入在此行之前
@@ -1037,7 +895,7 @@
                 var dps = __visitMultiLineFrag(frag); // deleted p lines
                 var pnext = delFromPHead || __splitToTag(start, rng.startOffset, 'P');
                 // FIXME
-                var parent = document.getElementById('editor');//pnext ? pnext.parentNode : document.getElementById('editor');
+                var parent = pnext ? pnext.parentNode : document.getElementById('editor');
                 Array.from(dps).reverse().forEach(p => pnext = parent.insertBefore(p, pnext));
 
                 // 整理焦点
@@ -1057,11 +915,11 @@
                 // console.log('after shrink\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
 
                 // 合并第一<p><del></p>行，往前
-                if (!delFromPHead && !delFromPTail) {
+                if (!delFromPHead) {
                     __mergeSibling(dps[0].previousSibling, true, false);
                 }
                 // 合并最后<p><del></p>行，往后
-                if (!delToPTail && !delToPHead) {
+                if (!delToPTail) {
                     __mergeSibling(dps[dps.length - 1], true, false);
                 }
                 // 删除最后一个空行<p><br></p>
@@ -1077,15 +935,10 @@
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
                 end = rng.endContainer;
-                console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+                // console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
 
                 // 插入<del>
                 var dbs = __visitMultiBlockFrag(frag); // deleted blocks
-                var p = domUtils.findParentByTagName(start, 'P', true);
-                if (!p) {
-                    console.error('some thing wrong!');
-                    return;
-                }
                 var bnext;
                 if (tmp = __inDel(start)) bnext = __splitToTag(start, rng.startOffset, 'DEL') || tmp.nextSibling;
                 else if (tmp = __inIns(start)) bnext = __splitToTag(start, rng.startOffset, 'INS') || tmp.nextSibling;
@@ -1100,7 +953,7 @@
                     console.error('not supported yet!');
                     return;
                 }
-                Array.from(dbs).reverse().forEach(b => bnext = p.insertBefore(b, bnext));
+                Array.from(dbs).reverse().forEach(b => bnext = bnext.parentNode.insertBefore(b, bnext));
 
                 // 整理焦点
                 if (cursorToStart) {
@@ -1118,7 +971,7 @@
                 rng = sel.getRangeAt(0);
                 start = rng.startContainer;
                 end = rng.endContainer;
-                console.log('after shrink\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+                // console.log('after shrink\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
 
                 // TODO 合并前后的删除节点
                 __mergeSibling(dbs[0], false, true);
@@ -1143,9 +996,7 @@
                     rng = sel.getRangeAt(0);
                     start = rng.startContainer;
                     end = rng.endContainer;
-                    // 隐藏删除标记时，删除到第一个字的时候会插入一个br，需要清理一下
-                    if((tmp = p.firstChild) && tmp.nodeType === 1 && tmp.tagName === 'BR' && p.childNodes.length > 1) p.removeChild(p.firstChild);
-                    console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
+                    // console.log('after delete\n', rng.startOffset, __toString(start), '\n', rng.endOffset, __toString(end));
 
                     var next = __splitToTag(start, rng.startOffset, 'P', true);
                     var parent = next ? next.parentNode : p;
@@ -1252,6 +1103,10 @@
                 __shrink();
                 tmp.parentNode.removeChild(tmp);
             }
+        };
+
+        var __beforeInput = function(evt) {
+            mobile.fixBIU(evt);
         };
 
         // 拖拽
@@ -1394,8 +1249,19 @@
                 console.warn(`抱歉，暂不支持执行命令: ${aCommandName}`);
                 return;
             }
+            console.log(aCommandName);
             __exec.call(document, aCommandName, aShowDefaultUI, aValueArgument);
         };
+        // document.addEventListener('beforeinput', evt => {
+        //     console.log('beforeinput', evt);
+        //     console.log('beforeinputinputType', evt.inputType);
+        //     __prevent(evt)
+        // }, false);
+        // document.addEventListener('input', evt => {
+        //     console.log('input', evt);
+        //     console.log('inputType', evt.inputType);
+        //     __prevent(evt)
+        // }, false);
 
     </script>
 
@@ -1463,6 +1329,7 @@
                 document.removeEventListener('dragenter', __drag, false);
                 document.removeEventListener('dragleave', __drag, false);
                 document.removeEventListener('drop', __drop, false);
+                document.removeEventListener('beforeinput', __beforeInput, false);
             }
             document.revised = revised;
             if (document.revised) {
@@ -1479,6 +1346,7 @@
                 document.addEventListener('dragenter', __drag, false);
                 document.addEventListener('dragleave', __drag, false);
                 document.addEventListener('drop', __drop, false);
+                document.addEventListener('beforeinput', __beforeInput, false);
             }
         }
         // 切换修订状态
@@ -1534,15 +1402,12 @@
 各省区市和计划单列市、新疆生产建设兵团，中央和国家机关有关部门负责同志，全国民政系统先进集体、先进工作者和劳动模范、“孺子牛奖”获得者代表等出席会议。
 责任编辑：郭立`
         );
-        setContent(
-            '<p>新华社北<del cite="veiky" datetime="2019-04-04T15:32">京4月2日电  近日，中共中央总书记、国</del>家主席、<ins cite="sun" datetime="2019-04-04T15:32">中央军委主席习近平</ins><ins cite="veiky" datetime="2019-04-04T15:32">对民政工作作出重</ins>要指示。习近平强调，近年来，民政系统认真贯彻中央决策部署，革弊鼎新、攻坚克难，各项事业取得新进展，有力服务了改革发展稳定大局。</p>\
-<p>习近平指出，民政<ins cite="veiky" datetime="2019-04-04T15:32">工作关系民生、连着民心，是社会建</ins>设的兜底性、基础性工作。各级党委和政府要坚持以人民为中心，加强对民政工作的领导，增强基层民政服务能力，推动民政事业持续健康发展。各级民政部门要加强党的建设，坚持改革创新，聚焦脱贫攻坚，聚焦特殊群体，聚焦群众关切，更好履行基本民生保障、基层社会治理、基本社会服务等职责，为全面建成小康社会、全面建设社会主<del cite="veiky" datetime="2019-04-04T15:32">义现代化国家作出</del><del cite="veiky" datetime="2019-04-04T15:32">新的</del><del cite="veiky" datetime="2019-04-04T15:32">贡献。</del></p>\
-<p><del cite="veiky" datetime="2019-04-04T15:32">第十四次全国民政会议4月2日在北京召开。会上传达了习近平的重要指示。</del></p>\
-<p>中共中央政治局常委、国务院总理李克强会见与会代表并讲话，向默默耕耘在基层一线、倾情尽力为困难群众服务的全国民政系统广大干部职工致以诚挚问候，对近年来民政工作取得的成绩充分肯定。他说，民政工作直接面对人民群众，是社会治理和社会服务的重要组成部分，是扶危济困的德政善举。当前，我国正处在全面建成小康社会的决胜阶段，人民追求美好生活的愿望十分强烈，民政工作的任务艰巨繁重。要坚持以习近平新时代中国特色社会主义思想为指导，贯彻落实党中央、国务院决策部署，着力保基本兜底线，织密扎牢民生保障“安全网”。服务打赢脱贫攻坚战，做好低保和特困人员包括生活困难的老年人、重度残疾人、重病患者、困境儿童等的基本生活保障工作。着力发展基本社会服务，解决好群众关切的“为难事”。深化“放管服”改革，让群众办事更便捷，更大发挥社会力量作用，积极发展贴近需求的社区养老托幼等服务，丰富生活服务供给，带动扩大就业和有效内需。要大力发展社会工作和慈善事业，弘扬志愿服务精神，人人参与、人人尽力，使社会大家庭更加温馨和谐。各级政府要贯彻以人民为中心的发展思想，关心民政、支持民政，多做雪中送炭、增进民生福祉的事，促进经济持续健康发展和社会和谐稳定。</p>\
-<p>国务委员王勇参加会见并在会上讲话指出，要深入学习贯彻习近平总书记关于民政工作的重要论述和指示精神，认真落实李克强总理讲话要求，牢固树立以人民为中心的发展思想，全面扎实完成脱贫攻坚兜底保障任务，加强和完善各类困难群体基本生活保障，不断提升基层社会治理和社会基本服务水平，努力推进民政事业改革发展上新台阶。</p>\
-<p>肖捷、何立峰参加会见。</p>\
-<p><del cite="veiky" datetime="2019-04-04T15:32">责任编辑：</del><ins  cite="veiky" datetime="2019-04-04T15:32">郭立</ins></p>'
-        );
+// 		setContent(
+// 			'<p>新华社北<del cite="veiky" datetime="2019-04-04T15:32">京4月2日电  近日，中共中央总书记、国</del>家主席、<ins cite="sun" datetime="2019-04-04T15:32">中央军委主席习近平</ins><ins cite="veiky" datetime="2019-04-04T15:32">对民政工作作出重</ins>要指示。习近平强调，近年来，民政系统认真贯彻中央决策部署，革弊鼎新、攻坚克难，各项事业取得新进展，有力服务了改革发展稳定大局。</p>\
+// <p>习近平指出，民政<ins cite="veiky" datetime="2019-04-04T15:32">工作关系民生、连着民心，是社会建</ins>设的兜底性、基础性工作。各级党委和政府要坚持以人民为中心，加强对民政工作的领导，增强基层民政服务能力，推动民政事业持续健康发展。各级民政部门要加强党的建设，坚持改革创新，聚焦脱贫攻坚，聚焦特殊群体，聚焦群众关切，更好履行基本民生保障、基层社会治理、基本社会服务等职责，为全面建成小康社会、全面建设社会主义现代化国家作出新的贡献。</p>\
+// <p><del cite="veiky" datetime="2019-04-04T15:32">第十四次全国民政会议4月2日在北京召开。会上传达了习近平的重要指示。</del></p>\
+// <p><del cite="veiky" datetime="2019-04-04T15:32">责任编辑：</del><ins cite="veiky" datetime="2019-04-04T15:32">郭立</ins></p>'
+// 		);
 			// setContent(
 			// 	'<p>新华社北<del cite="veiky" datetime="2019-04-04T15:32">京4月2日电  近日，中共中央总书记、国</del>家主席、<ins cite="sun" datetime="2019-04-04T15:32">中央军委主席习近平对</ins><ins cite="veiky" datetime="2019-04-04T15:32">民政工作作出重</ins>要指示。习近平强调，近年来，民政系统认真贯彻中央决策部署，革弊鼎新、攻坚克难，各项事业取得新进展，有力服务了改革发展稳定大局。</p>'
 			// );
@@ -1553,8 +1418,7 @@
 
 
     <!-- 以下是可以删除的测试部分 -->
-    <div id="test_panel"
-        style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; padding: 10px;">
+    <div id="test_panel" style="position: fixed; display: block; background: gray; border-radius: 10px; box-shadow: 0 0 10px black; right: 10px; bottom: 10px; padding: 10px;">
         <label>当前编辑用户：
             <select onchange="setUser(this.value)">
                 <option>veiky</option>
@@ -1576,9 +1440,7 @@
 
         <button onclick="test_setContent()">setContent</button>
         <button onclick="insertHtml('test')">insert text</button>
-        <button
-            onclick="insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert
-            image
+        <button onclick="insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image
         </button>
         <button onclick="insertVideo('http://www.w3school.com.cn/i/movie.ogg')">insert video</button>
         <!-- 	<button onclick="test_insertImage('https://upload-images.jianshu.io/upload_images/2942992-580d0776dc206532.jpg?imageMogr2/auto-orient/strip|imageView2/1/w/300/h/240')">insert image 2</button>
